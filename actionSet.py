@@ -4,7 +4,7 @@ Created on Wed Dec 25 22:04:00 2019
 
 @author: Kun Lun Huang
 """
-import hw5util as util
+from hw5util import hw5util as util
 from matplotlib import pyplot as plt
 
 BRAND_LIST = ['zenfone', 'iphone', 'oppo', 'galaxy', 'p10' ,'mate']

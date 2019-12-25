@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 import re
 
-def readAndAppend(pathLst, sep = "|"):
+def readAndAppend(pathLst, sep = ","):
     if len(pathLst) <= 0:
         print("no csv file fond.")
         raise AttributeError
@@ -17,18 +17,19 @@ def readAndAppend(pathLst, sep = "|"):
         try:
             temp = pd.read_csv(posPath, sep = sep, engine='python', encoding='utf-8-sig')
         except:
-            print(f'something went wrong when dealling with {posPath}')
+            print(f'something went wrong when loading with {posPath}')
             print('this file has been skipped')
             continue
+    
         try:
             theTb = theTb.append(temp, ignore_index = True)
         except:
-            print(f'something went wrong when dealling with {posPath}')
+            print(f'something went wrong when appending with {posPath}')
             print('this file has been skipped')
         
     return theTb
 
-def readBrandPos(brandName, dataFolder=".\\", sep = "|"):
+def readBrandPos(brandName, dataFolder=".\\", sep = ","):
     """
     把所有XXX_pos.csv檔案讀進來成為一個檔案
     不要亂改檔名
@@ -48,7 +49,7 @@ def readBrandPos(brandName, dataFolder=".\\", sep = "|"):
             
     return brandPosTb
 
-def readBrandEntity(brandName, dataFolder=".\\", sep = "|"):
+def readBrandEntity(brandName, dataFolder=".\\", sep = ","):
     dataFolder = Path(f".\\{dataFolder}")
     if not dataFolder.exists():
         print("Folder not found.")
@@ -59,7 +60,7 @@ def readBrandEntity(brandName, dataFolder=".\\", sep = "|"):
     if len(entityTbList) <= 0:
         print("no csv file fond.")
         raise AttributeError
-    
+        
     entityPosTb = readAndAppend(entityTbList)
         
     return entityPosTb
@@ -136,6 +137,14 @@ def wordFilter(df, wordLst = preDefined_stopList, kickOut = True):
         localTemp = localTemp[localTemp.apply(lambda x : not ifContain(x['word'], wordLst), axis = 1)]
     else:
         localTemp = localTemp[localTemp.apply(lambda x : ifContain(x['word'], wordLst), axis = 1)]
+    return localTemp
+
+def entityFilter(df, wordLst = preDefined_stopList, kickOut = True):
+    localTemp = pd.DataFrame(df)
+    if kickOut:
+        localTemp = localTemp[localTemp.apply(lambda x : not ifContain(x['entity'], wordLst), axis = 1)]
+    else:
+        localTemp = localTemp[localTemp.apply(lambda x : ifContain(x['entity'], wordLst), axis = 1)]
     return localTemp
 
 def wordLenFilter(df, lowerBound=1, upperBound = -1, kickOut = True):
