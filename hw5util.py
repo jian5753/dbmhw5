@@ -4,6 +4,17 @@ import pandas as pd
 from pathlib import Path
 import re
 
+def readOtherCol(sourcePath):
+    theTb = pd.read_csv(next(Path(sourcePath).glob('otherCol.csv')),
+                        encoding = 'utf-8-sig')
+    try:
+        theTb['post_time'] = pd.to_datetime(theTb['post_time'])
+    except:
+        print('something wrong when dealing with col, /"post_time/"')
+        print('return None')
+        return None
+    return theTb
+
 def readAndAppend(pathLst, sep = ","):
     if len(pathLst) <= 0:
         print("no csv file fond.")
@@ -64,6 +75,10 @@ def readBrandEntity(brandName, dataFolder=".\\", sep = ","):
     entityPosTb = readAndAppend(entityTbList)
         
     return entityPosTb
+
+###########################################################
+#                       filter fcn                        #
+###########################################################
 
 
 def ifContain(LongStr, shortStrLst, OR = True, ignoreCase = True):
@@ -127,7 +142,9 @@ def roleFilter(df, roleLst=preDefined_disLikeRole, kickOut = True):
 def roleAdder(target, source, roleLst=['neu']):
     localTemp = pd.DataFrame(target)
     for role in roleLst:
-        localTemp = localTemp.append(source[source['role']==role])
+        toAdd = source[source['role']==role]
+        print(toAdd.shape)
+        localTemp = localTemp.append(toAdd)
     
     return localTemp
 
@@ -205,10 +222,8 @@ def nearBy(df, desiredWord, width_pre = 5, width_post = 5, removeSelf=True):
     
     return toReturn
 
-def rowValueFilter(df, colName, desireLst):
-    localTemp = pd.DataFrame(df)
-    localTemp = localTemp[localTemp.apply(lambda x : inFilter(x[colName], desireLst), axis = 1)]
-    return localTemp
+def idFilter(target, desiredIdSeries):
+    return desiredIdSeries.merge(target, on = 'articleID', how='left')
 
 
 ###########################################################
@@ -233,8 +248,30 @@ def count_GbyEntity(df, ascending = False):
     return temp.sort_values(by = 'count', ascending=ascending)
 
 ###########################################################
-#                       histogram                         #
+#                          time                           #
 ###########################################################
     
-
+def timeFilter_getID(otherColdf, lowerBound, upperBound):
+    localTemp = pd.DataFrame(otherColdf[['id','post_time']])
+    try:
+        localTemp = localTemp[localTemp['post_time'] <= upperBound]
+        #print(localTemp.shape)
+    except:
+        print('upperbound failure, no upperBound applied')
     
+    try:
+        localTemp = localTemp[localTemp['post_time'] >= lowerBound]
+        #print(localTemp.shape)
+    except:
+        print('lowerBound failure, no lowerBound applied')
+        
+    localTemp.columns=['articleID', 'post_time']
+
+    return localTemp.iloc[:, 0:1]
+
+def timeFilter(target, otherColdf, lowerBound, upperBound):
+    ids = timeFilter_getID(otherColdf, lowerBound, upperBound)
+    localTemp = pd.DataFrame(target)
+    localTemp = idFilter(localTemp, ids)
+
+    return localTemp

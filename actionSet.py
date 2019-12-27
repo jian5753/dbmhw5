@@ -25,21 +25,23 @@ def tripleRefine(df):
     
     return temp
 
-def wordHist(df, headCnt):
-    freqWord = util.count_GbyWord(df).head(headCnt)
+def barChart(df, title):
     plt.figure(figsize=(20, 10))
-    plt.bar(freqWord.index, freqWord['count'])
+    plt.bar(df.index, df['count'])
     plt.xticks(size=15) 
     plt.yticks(size=10)
+    plt.title(label=title)
     
+
+def wordHist(df, headCnt, title = ""):
+    freqWord = util.count_GbyWord(df).head(headCnt)
+    barChart(freqWord, title)
+
     return freqWord
 
-def entityHist(df, headCnt):
+def entityHist(df, headCnt, title = ""):
     freqWord = util.count_GbyEntity(df).head(headCnt)
-    plt.figure(figsize=(20, 10))
-    plt.bar(freqWord.index, freqWord['count'])
-    plt.xticks(size=15) 
-    plt.yticks(size=10)
+    barChart(freqWord, title)
     
     return freqWord
 
