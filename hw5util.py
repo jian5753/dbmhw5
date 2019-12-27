@@ -13,6 +13,11 @@ def readOtherCol(sourcePath):
         print('something wrong when dealing with col, /"post_time/"')
         print('return None')
         return None
+    
+    theTb.columns=['articleID', 'p_type', 's_id', 's_area_id', 's_name', 's_area_name',
+                   'content_type', 'main_id', 'content_no', 'comment_count',
+                   'post_time', 'title', 'author', 'page_url', 'negative_score',
+                   'positive_score', 'pos', 'neg']
     return theTb
 
 def readAndAppend(pathLst, sep = ","):
@@ -131,7 +136,7 @@ preDefined_stopList = ["手機","可以","使用","com","所以","還是","真�
 
 
 def roleFilter(df, roleLst=preDefined_disLikeRole, kickOut = True):
-    localTemp = pd.DataFrame(df)
+    localTemp = df.copy(deep=True)
     if kickOut:
         localTemp = localTemp[localTemp.apply(lambda x : not ifContain(x['role'], roleLst), axis = 1)]
     else:
@@ -140,7 +145,7 @@ def roleFilter(df, roleLst=preDefined_disLikeRole, kickOut = True):
     return localTemp
 
 def roleAdder(target, source, roleLst=['neu']):
-    localTemp = pd.DataFrame(target)
+    localTemp = target.copy(deep=True)
     for role in roleLst:
         toAdd = source[source['role']==role]
         print(toAdd.shape)
@@ -149,7 +154,7 @@ def roleAdder(target, source, roleLst=['neu']):
     return localTemp
 
 def wordFilter(df, wordLst = preDefined_stopList, kickOut = True):
-    localTemp = pd.DataFrame(df)
+    localTemp = df.copy(deep=True)
     if kickOut:
         localTemp = localTemp[localTemp.apply(lambda x : not ifContain(x['word'], wordLst), axis = 1)]
     else:
@@ -157,7 +162,7 @@ def wordFilter(df, wordLst = preDefined_stopList, kickOut = True):
     return localTemp
 
 def entityFilter(df, wordLst = preDefined_stopList, kickOut = True):
-    localTemp = pd.DataFrame(df)
+    localTemp = df.copy(deep=True)
     if kickOut:
         localTemp = localTemp[localTemp.apply(lambda x : not ifContain(x['entity'], wordLst), axis = 1)]
     else:
@@ -165,7 +170,7 @@ def entityFilter(df, wordLst = preDefined_stopList, kickOut = True):
     return localTemp
 
 def wordLenFilter(df, lowerBound=1, upperBound = -1, kickOut = True):
-    localTemp = pd.DataFrame(df)
+    localTemp = df.copy(deep=True)
     if kickOut:
         filterSer = localTemp.apply(lambda x : lenFilter(x['word'],
                                                              lowerBound,
@@ -190,49 +195,48 @@ def nearBy(df, desiredWord, width_pre = 5, width_post = 5, removeSelf=True):
         print('need to be list')
         return df
     
-    localTemp = pd.DataFrame(df)
-    localTemp.index = list(range(localTemp.shape[0]))
-    
-    indices = wordFilter(localTemp, wordLst=desiredWord, kickOut=False).index
-    expandedIndices = []
-    intervalTag = []
-    innerIdx = []
-    for i, idx in enumerate(indices):
-        #print(idx)
-        thisArticleID = localTemp.loc[idx,'articleID']
-        newIndices = list(range(idx-width_pre, idx+width_post))
-        if removeSelf:
-            newIndices.remove(idx)
-        try:    
-            window = localTemp[localTemp['articleID']==thisArticleID]
-            window = window.reindex(newIndices)['articleID']
-            #window = window.loc[newIndices,'articleID']
-            window.dropna(axis=0,inplace=True)
-            newIndices = window.index
-        except KeyError:
-            newIndices = []
-            
-        expandedIndices.extend(newIndices)
-        intervalTag.extend([f'interval_{i}']*len(newIndices))
-        innerIdx.extend(list(range(len(newIndices))))
+    localTemp = df.copy(deep=True)
+    try:
+        localTemp.reset_index(level=0, inplace=True)
+        localTemp.set_index(['articleID', 'wordCnt'], inplace = True)
+    except:
+        print('something went wrong, check if its a \" POS \" table')
         
-    toReturn = localTemp.loc[expandedIndices]
-    toReturn['interval_n'] = intervalTag
-    toReturn['innerIdx'] = innerIdx
+    indices = wordFilter(localTemp, wordLst=desiredWord, kickOut=False).index
+    IDX = pd.IndexSlice
     
+    toReturn = pd.DataFrame(columns=['articleID', 'wordCnt', 'index',
+                                     'role', 'word', 'interval_n', 'innerIdx'])
+    toReturn.set_index(['articleID', 'wordCnt'], inplace=True)
+    
+    for i, idx in enumerate(indices):
+        ub = idx[1]+width_post
+        lb = idx[1]-width_pre
+        temp = localTemp.loc[IDX[idx[0],:],:]
+        temp2 = temp.loc[IDX[:,lb:ub],:]
+        del temp
+        temp2['interval_n'] = i
+        temp2['innerIdx'] = list(range(temp2.shape[0]))
+        toReturn = pd.concat([toReturn, temp2], axis = 0)
+        
+    toReturn.reset_index(level=[0,1], inplace = True)
+    toReturn.set_index('index', inplace = True)
+    toReturn.index.name=None
     return toReturn
-
+    
+    
 def idFilter(target, desiredIdSeries):
-    return desiredIdSeries.merge(target, on = 'articleID', how='left')
+    return desiredIdSeries.merge(target, on = 'articleID', how='inner')
 
 
 ###########################################################
 #                     aggregate fcn                       #
 ###########################################################
     
-def count_gby(df, colName):
+def count_gby(df, colName, porpotion='Fasle'):
     temp = df.groupby([colName]).count().iloc[:,0:1]
-    temp.columns = ['count']    
+    temp.columns = ['count']
+    
     return temp
     
 def count_GbyRole(df, ascending = False):
@@ -243,6 +247,18 @@ def count_GbyWord(df, ascending = False):
     temp = count_gby(df, 'word')
     return temp.sort_values(by = 'count', ascending=ascending)
 
+def porpotion_gby(df, colName):
+    return None
+
+def porpotion_GbyWord(df, ascending = False):
+    totalArticleCnt = df.articleID.nunique()
+    temp = df.groupby(['word']).nunique('articleID').iloc[:,0:1]
+    temp['articleID'] = temp['articleID'] / totalArticleCnt
+    temp.columns = ['porpotion']
+    
+    return temp.sort_values(by = 'porpotion', ascending=ascending)
+    
+
 def count_GbyEntity(df, ascending = False):
     temp = count_gby(df, 'entity')
     return temp.sort_values(by = 'count', ascending=ascending)
@@ -252,7 +268,7 @@ def count_GbyEntity(df, ascending = False):
 ###########################################################
     
 def timeFilter_getID(otherColdf, lowerBound, upperBound):
-    localTemp = pd.DataFrame(otherColdf[['id','post_time']])
+    localTemp = pd.DataFrame(otherColdf[['articleID','post_time']])
     try:
         localTemp = localTemp[localTemp['post_time'] <= upperBound]
         #print(localTemp.shape)
